@@ -15,6 +15,8 @@
 // Yet another sort app using Insertion Sort algorithm
 // (Distributed Client/Server implementation)
 //
+// Client Version
+//
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -56,7 +58,7 @@ main (int argc, const char **argv)
 	// Test for correct number of arguments
 	if (argc != 4) {
 		print_usage();
-		return(1);
+		return (1);
 	}
 
 	print_debug("Client running in DEBUG mode!");
@@ -71,7 +73,7 @@ main (int argc, const char **argv)
 	// Get server address info
 	if (getaddrinfo(server_address, server_port, &hints, &addr_res) != 0) {
 		print_error("getaddrinfo() failed");
-		return(1);
+		return (1);
 	}
 
 	get_addrinfo_ipstr(server_addrstr, addr_res);
@@ -82,14 +84,14 @@ main (int argc, const char **argv)
 	    addr_res->ai_protocol);
 	if (sock < 0) {
 		print_error("socket() failed");
-		return(1);
+		return (1);
 	}
 
 	// Establish the connection to the server
 	if (connect(sock, addr_res->ai_addr, addr_res->ai_addrlen) < 0) {
 		print_error("connect() failed");
-		return(1);
+		return (1);
 	}
 
-	return(0);
+	return (0);
 }
