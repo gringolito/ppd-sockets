@@ -48,7 +48,7 @@ int
 main (int argc, const char **argv)
 {
 	int sock;
-	char *server_address;
+	char *server_address = "127.0.0.1";
 	char server_addrstr[INET6_ADDRSTRLEN];
 	char server_port[MAXPORT_SIZE];
 	struct addrinfo *addr_res;

@@ -30,13 +30,10 @@
 #include <sys/types.h>
 #include "utils.h"
 #include "print.h"
-#include "network.h"
 #include "debug.h"
+#include "network.h"
+#include "msg.h"
 #include "fifo.h"
-
-void *receive_buffer = NULL;
-void *send_buffer = NULL;
-void *send_msg = NULL;
 
 static void
 print_usage (void)
@@ -62,7 +59,7 @@ remove_client (fd_set *readers, int fdmax, int sock)
 }
 
 static int
-handle_messages (void)
+handle_messages (fifo_t *receive_buffer)
 {
 	int empty;
 	int return_status = 0;
@@ -100,10 +97,9 @@ main (int argc, const char **argv)
 	int fdmax;
 	int sock_error = 0;
 	int select_ret;
-	int addr_infost;
+	int addr_info;
 	int server_sock;
 	int client_sock;
-	int *recv_msg = NULL;
 	char server_port[MAXPORT_SIZE];
 	char server_addrstr[INET6_ADDRSTRLEN];
 	char client_addrstr[INET6_ADDRSTRLEN];
@@ -112,10 +108,13 @@ main (int argc, const char **argv)
 	struct sockaddr_storage client_addr;
 	struct timeval timeout;
 	struct timeval sel_to;
+	struct msg *msg;
 	socklen_t client_addrsize;
 	fd_set sel_read;
 	fd_set readers;
 	fd_set writers;
+	fifo_t *receive_buffer;
+	fifo_t *send_buffer;
 
 	prgname = argv[0];
 	if (argc > 2) {
@@ -145,10 +144,10 @@ main (int argc, const char **argv)
 	hints.ai_flags    = AI_PASSIVE;
 
 	// Get server address info
-	addr_infost = getaddrinfo("localhost", server_port, &hints, &addr_res);
-	if (addr_infost) {
+	addr_info = getaddrinfo("localhost", server_port, &hints, &addr_res);
+	if (addr_info) {
 		print_error("getaddrinfo() failed: %s",
-		    gai_strerror(addr_infost));
+		    gai_strerror(addr_info));
 		return (1);
 	}
 
@@ -185,10 +184,12 @@ main (int argc, const char **argv)
 		return (1);
 	}
 
-	// Initializing descriptors
+	// Initializing descriptors and FIFOs
 	FD_ZERO(&readers);
 	FD_SET(server_sock, &readers);
 	fdmax = server_sock;
+	receive_buffer = fifo_new();
+	send_buffer = fifo_new();
 
 	client_addrsize = (socklen_t) sizeof(client_addr);
 
@@ -227,11 +228,11 @@ main (int argc, const char **argv)
 		// Send / receive messages
 		for (i = 0; i <= fdmax; i++) {
 			if (FD_ISSET(i, &sel_read) && i != server_sock) {
-				print_debug("Trying receive_bp() in "
+				print_debug("Trying receive_msg() in "
 				    "socket %d ...", i);
-				// recv_msg = receive_bp(i);
-				if (!recv_msg) {
-					print_error("receice_bp() failed, "
+				msg = receive_msg(i);
+				if (!msg) {
+					print_error("receice_msg() failed, "
 					    "closing socket");
 					FD_CLR(i, &readers);
 					if (i == fdmax) {
@@ -239,24 +240,24 @@ main (int argc, const char **argv)
 					}
 					close(i);
 				} else {
-					fifo_add(receive_buffer, recv_msg);
+					fifo_add(receive_buffer, msg);
 				}
 			}
 		}
 
 		// Handle received messages
-		if (handle_messages() < 0) {
+		if (handle_messages(receive_buffer) < 0) {
 			print_error("handle_messages() failed");
 		}
 
 		// If are messages, send it to clients
 		empty = fifo_empty(send_buffer);
 		while (!empty) {
-			print_debug("Trying send_bp() ...");
-			send_msg = fifo_remove(send_buffer);
-			// sock_error = send_bp(send_msg);
+			print_debug("Trying send_msg() ...");
+			msg = fifo_remove(send_buffer);
+			sock_error = send_msg(msg);
 			if (sock_error > 0) {
-				print_error("send_bp() failed, closing socket");
+				print_error("send_msg() failed, closing socket");
 				FD_CLR(sock_error, &readers);
 				if (sock_error == fdmax) {
 					fdmax--;
