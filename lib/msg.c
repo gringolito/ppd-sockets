@@ -18,7 +18,9 @@
 #include "msg.h"
 #include "network.h"
 #include "debug.h"
+#include <unistd.h>
 #include <stdlib.h>
+#include <sys/uio.h>
 
 void
 free_msg (struct msg *msg)
@@ -32,6 +34,7 @@ send_msg (struct msg *msg)
 {
 	int ret = 0;
 	size_t i;
+	struct iovec iov[2];
 
 	if (!msg) {
 		return (-1);
@@ -43,16 +46,15 @@ send_msg (struct msg *msg)
 	}
 	msg->size = htonl(msg->size);
 
-	if (tcp_send(msg->sock, &msg->size, sizeof(msg->size), 0) < 0) {
+	iov[0].iov_base = &msg->size;
+	iov[0].iov_len = sizeof(msg->size);
+	iov[1].iov_base = msg->data;
+	iov[1].iov_len = msg->size;
+
+	if (writev(msg->sock, iov, 2) < 0) {
 		ret = msg->sock;
-		goto error;
 	}
 
-	if (tcp_send(msg->sock, msg->data, msg->size, 1) < 0) {
-		ret = msg->sock;
-	}
-
-error:
 	free_msg(msg);
 	return (ret);
 }
@@ -65,7 +67,7 @@ receive_msg (int sock)
 	uint32_t *data;
 	struct msg *msg = NULL;
 
-	if (tcp_recv(sock, &size, sizeof(size)) < 0) {
+	if (read(sock, &size, sizeof(size)) < 0) {
 		goto error;
 	}
 	size = ntohl(size);
@@ -75,7 +77,7 @@ receive_msg (int sock)
 		print_error("calloc() failed");
 		goto error;
 	}
-	if (tcp_recv(sock, data, size) < 0) {
+	if (read(sock, data, size) < 0) {
 		free(data);
 		goto error;
 	}

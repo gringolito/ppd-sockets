@@ -21,16 +21,11 @@
 #include <netinet/in.h>
 
 ssize_t
-tcp_send (int sock, void *buf, size_t size, int eom)
+tcp_send (int sock, void *buf, size_t size)
 {
-	int more = 0;
 	ssize_t ret;
 
-	if (!eom) {
-		more = MSG_MORE;
-	}
-
-	if ((ret = send(sock, buf, size, more)) != (ssize_t) size) {
+	if ((ret = send(sock, buf, size, 0)) != (ssize_t) size) {
 		print_errno("send() sent a different number of bytes than "
 		    "expected");
 	}

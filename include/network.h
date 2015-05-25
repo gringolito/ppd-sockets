@@ -26,29 +26,6 @@
 #define MAX_PENDING                    (100)
 
 /**
- * @brief 
- *
- * @param sock
- * @param buf
- * @param size
- * @param eom
- *
- * @return 
- */
-ssize_t tcp_send (int sock, void *buf, size_t size, int eom);
-
-/**
- * @brief 
- *
- * @param sock
- * @param buf
- * @param size
- *
- * @return 
- */
-ssize_t tcp_recv (int sock, void *buf, size_t size);
-
-/**
  * @brief Get a human readable IP address from a given struct addrinfo
  *
  * @param dest Human reabable IPv4/IPv6 address, must be alloced before
