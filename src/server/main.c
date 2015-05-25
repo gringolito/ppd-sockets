@@ -12,8 +12,10 @@
 // "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in
 // this document are to be interpreted as described in RFC 2119.
 //
-// Yet another sort app using Insertion Sort algorithm
+// Yet another sort app using Insertion Sort algorithm (Server)
 // (Distributed Client/Server implementation)
+//
+// Server Version
 //
 
 #include <stdlib.h>
@@ -205,6 +207,7 @@ main (int argc, const char **argv)
 			    (struct sockaddr *) &client_addr, &client_addrsize);
 			if (client_sock < 0) {
 				print_error("accept() failed");
+				continue;
 			}
 
 			// Getting IP address
