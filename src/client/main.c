@@ -23,11 +23,13 @@
 #include <string.h>
 #include <ctype.h>
 #include <netdb.h>
-#include <pthread.h>
-#include <semaphore.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include "utils.h"
+#include "print.h"
+#include "network.h"
+#include "debug.h"
 
 #define MAX_ELEM                                    (500000)
 #define FILENAME                                    "sorted_vector.txt"

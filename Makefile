@@ -14,11 +14,11 @@
 # You probably don't need to modify anything in this Makefile.
 #
 
-APPS:=sequential parallel
+APPS:=server client
 LIBS:=lib
-DIRS:=src/sequential src/parallel lib
+DIRS:=src/server src/client lib
 
-.PHONY : $(APPS) $(LIBS) mpi install clean
+.PHONY : $(APPS) $(LIBS) install clean
 
 all    : $(APPS)
 
@@ -29,8 +29,6 @@ $(LIBS):
 
 $(APPS): $(LIBS)
 	@$(MAKE) -C src/$@
-
-mpi    : parallel
 
 install: $(APPS)
 	@for dir in $(APPS); do \

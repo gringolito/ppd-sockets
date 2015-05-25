@@ -18,7 +18,10 @@
 #define __FUTZIG_NETWORK_H
 
 #include <netdb.h>
-#include <sys/sockets.h>
+#include <sys/socket.h>
+
+#define MAXPORT_SIZE                   (6)
+#define MAX_PENDING                    (100)
 
 /**
  * @brief Get a human readable IP address from a given struct addrinfo

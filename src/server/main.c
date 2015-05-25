@@ -23,118 +23,55 @@
 #include <string.h>
 #include <ctype.h>
 #include <netdb.h>
-#include <pthread.h>
-#include <semaphore.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include "utils.h"
+#include "print.h"
+#include "network.h"
+#include "debug.h"
+#include "fifo.h"
 
-#define MAX_ELEM                                    (500000)
-#define MPI_TAG                                     (0)
-#define MPI_TERMINATE                               (-1)
-#define FILENAME                                    "sorted_vector.txt"
+void *receive_buffer = NULL;
+void *send_buffer = NULL;
+void *send_msg = NULL;
 
 static void
 print_usage (void)
 {
-	printf("Usage: %s FILE SIZE\n", PROG_NAME);
-	printf("\tFILE File containing vector data\n");
-	printf("\tSIZE Size of vector (Maximum size: %d)\n", MAX_ELEM);
+	printf("Usage: %s <PORT>\n", PROG_NAME);
+	printf("\tPORT TCP listen port\n");
 }
 
-void
-get_addrinfo_ipstr (char *dest, struct addrinfo *ptr)
+static int
+remove_client (fd_set *readers, int fdmax, int sock)
 {
-	void *addr;
-
-	/* ÌPv4 */
-	if (ptr->ai_family == AF_INET) {
-		struct sockaddr_in *ipv4 = (struct sockaddr_in *) ptr->ai_addr;
-		addr = &(ipv4->sin_addr);
-	/* ÌPv6 */
-	} else {
-		struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)ptr->ai_addr;
-		addr = &(ipv6->sin6_addr);
-	}
-	/* Convert the IP to a string */
-	inet_ntop(ptr->ai_family, addr, dest, sizeof(INET6_ADDRSTRLEN));
-}
-
-void
-get_sockaddr_ipstr (char *dest, struct sockaddr *src)
-{
-	void *addr;
-
-	/* ÌPv4 */
-	if (src->sa_family == AF_INET) {
-		struct sockaddr_in *ipv4 = (struct sockaddr_in *)src;
-		addr = &(ipv4->sin_addr);
-	/* ÌPv6 */
-	} else {
-		struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)src;
-		addr = &(ipv6->sin6_addr);
-	}
-	/* Convert the IP to a string */
-	inet_ntop(src->sa_family, addr, dest, sizeof(INET6_ADDRSTRLEN));
-}
-
-void
-send_to_client (int sock, unsigned char type, uint16_t size, void *payload)
-{
-	bpmsg_t * send_msg;
-	print_debug("entrei funcao send_to_client");
-
-	/* Monta o pacote que ira para o servidor */
-	send_msg = malloc(sizeof(*send_msg));
-	send_msg->type = type;
-	send_msg->size = size;
-	send_msg->sock = sock;
-	send_msg->payload = malloc(size);
-
-	/*memcpy(send_msg->payload, payload, size);*/
-
-	print_debug("Montei pacote");
-
-	fifo_add(send_buffer, send_msg);
-	print_debug("add pacote na fifo");
-}
-
-void
-remove_client (int sock)
-{
-	/* Unsetting file descriptors for select */
-	FD_CLR(sock, &readers);
+	// Unsetting file descriptors for select
+	FD_CLR(sock, readers);
 
 	if (sock == fdmax) {
 		fdmax--;
 	}
 
-	/* Closing socket connection */
+	// Closing socket connection
 	close(sock);
 
-	/* Releasing and cleaning memory */
-	clients[sock].uid = 0;
-	clients[sock].sock = 0;
-	clients[sock].status = 0;
-	free(clients[sock].username);
-	free(clients[sock].ip);
-
-	/* Updating counters */
-	connected_clients--;
+	return (fdmax);
 }
 
-int
+static int
 handle_messages (void)
 {
 	int empty;
 	int return_status = 0;
+	char *msg;
+	void *client = NULL;
 
 	empty = fifo_empty(receive_buffer);
 	while (!empty) {
 		msg = fifo_remove(receive_buffer);
 
-		client = &clients[msg->sock];
-
+		// TODO FIND CLIENT
 		if (!client) {
 			print_error("[Handler] client not found in list");
 			return_status++;
@@ -144,11 +81,6 @@ handle_messages (void)
 		}
 
 		// Handle messages
-		switch (msg->type) {
-		default :
-			print_error("[Handler] message type error");
-			break;
-		}
 
 		free(msg);
 		empty = fifo_empty(receive_buffer);
@@ -164,14 +96,15 @@ main (int argc, const char **argv)
 	int yes;
 	int empty;
 	int fdmax;
-	int sock_error;
+	int sock_error = 0;
 	int select_ret;
 	int addr_infost;
 	int server_sock;
 	int client_sock;
-	char *client_addrstr;
+	int *recv_msg = NULL;
 	char server_port[MAXPORT_SIZE];
 	char server_addrstr[INET6_ADDRSTRLEN];
+	char client_addrstr[INET6_ADDRSTRLEN];
 	struct addrinfo *addr_res;
 	struct addrinfo hints;
 	struct sockaddr_storage client_addr;
@@ -245,7 +178,7 @@ main (int argc, const char **argv)
 	}
 
 	// Mark the socket so it will listen for incoming connections
-	if (listen(server_sock, BS_MAX_PENDING) < 0) {
+	if (listen(server_sock, MAX_PENDING) < 0) {
 		print_error("listen() failed");
 		return (1);
 	}
@@ -257,7 +190,7 @@ main (int argc, const char **argv)
 
 	client_addrsize = (socklen_t) sizeof(client_addr);
 
-	for (EVER) {
+	for EVER {
 		sel_to = timeout;
 		sel_read = readers;
 		select_ret = select(fdmax + 1, &sel_read, NULL, NULL, &sel_to);
@@ -275,7 +208,6 @@ main (int argc, const char **argv)
 			}
 
 			// Getting IP address
-			client_addrstr = malloc(sizeof(INET6_ADDRSTRLEN));
 			get_sockaddr_ipstr(client_addrstr,
 			    (struct sockaddr *) &client_addr);
 			printf("Handling client %s on socket %d\n",
@@ -294,7 +226,7 @@ main (int argc, const char **argv)
 			if (FD_ISSET(i, &sel_read) && i != server_sock) {
 				print_debug("Trying receive_bp() in "
 				    "socket %d ...", i);
-				recv_msg = receive_bp(i);
+				// recv_msg = receive_bp(i);
 				if (!recv_msg) {
 					print_error("receice_bp() failed, "
 					    "closing socket");
@@ -319,7 +251,7 @@ main (int argc, const char **argv)
 		while (!empty) {
 			print_debug("Trying send_bp() ...");
 			send_msg = fifo_remove(send_buffer);
-			sock_error = send_bp(send_msg);
+			// sock_error = send_bp(send_msg);
 			if (sock_error > 0) {
 				print_error("send_bp() failed, closing socket");
 				FD_CLR(sock_error, &readers);
