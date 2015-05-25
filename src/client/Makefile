@@ -10,9 +10,9 @@
 #
 #***********************************************************************
 
-CC=gcc
+CC=cc
 #CFLAGS=-Wall -Wextra -std=c99 -pipe -Og -g3
-CFLAGS=-Wall -Wextra -std=c99 -pipe -O3 -J5 -march=native
+CFLAGS=-Wall -Wextra -std=c99 -pipe -O3 -march=native
 LDFLAGS=
 EXTRA_CFLAGS=-DPROG_NAME=\"$(TARGET)\"
 DEBUG=no

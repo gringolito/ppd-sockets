@@ -16,6 +16,7 @@
 
 #include "network.h"
 #include <arpa/inet.h>
+#include <netinet/in.h>
 
 void
 get_addrinfo_ipstr (char *dest, struct addrinfo *ptr)
