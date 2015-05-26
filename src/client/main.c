@@ -35,7 +35,7 @@
 #include "msg.h"
 #include "rank_sort.h"
 
-#define MAX_ELEM                                    (100000)
+#define MAX_ELEM                                    (100)
 #define MAX_SERVERS                                 (10)
 #define MAXNAME_SIZE                                (64)
 #define FILENAME                                    "sorted_vector.txt"
@@ -51,16 +51,17 @@ print_usage (void)
 }
 
 static void
-sort_message(uint32_t *buf, const struct msg *msg, int last)
+sort_message(int *buf, const struct msg *msg, int last)
 {
-	memcpy(&buf[last], msg->data, msg->size);
-	merge_vector((int *)buf, 0, last, last + msg->size);
+	memcpy(&buf[last], msg->data, msg->size * sizeof(*msg->data));
+	merge_vector(buf, 0, last, last + msg->size);
 }
 
 int
 main (int argc, const char **argv)
 {
 	int i;
+	int j;
 	int ret;
 	int use;
 	int sock;
@@ -71,8 +72,8 @@ main (int argc, const char **argv)
 	int last = 0;
 	int recv = 0;
 	int socks[MAX_SERVERS];
-	uint32_t readv[MAX_ELEM];
-	uint32_t sortv[MAX_ELEM];
+	int readv[MAX_ELEM];
+	int sortv[MAX_ELEM];
 	char server_addr[INET6_ADDRSTRLEN];
 	char server_addrstr[INET6_ADDRSTRLEN];
 	char server_port[MAXPORT_SIZE];
@@ -117,8 +118,8 @@ main (int argc, const char **argv)
 		print_errno("fopen() failed");
 		return (1);
 	}
-	for (i = 0; (size_t) i < MAX_ELEM; i++) {
-		ret = fscanf(fd, "%u", &readv[i]);
+	for (i = 0; i < MAX_ELEM; i++) {
+		ret = fscanf(fd, "%d", &readv[i]);
 		if (ret < 0) {
 			print_errno("fscanf() failed!");
 			return (ret);
@@ -210,13 +211,15 @@ main (int argc, const char **argv)
 		msg->sock = socks[use];
 
 		if (i == jobs - 1) {
-			msg->size = MAX_ELEM % jobs;
+			msg->size = (MAX_ELEM / jobs) + (MAX_ELEM % jobs);
 		} else {
 			msg->size = MAX_ELEM / jobs;
 		}
 
 		msg->data = calloc(msg->size, sizeof(*msg->data));
-		memcpy(msg->data, &readv[last], msg->size);
+		for (j = 0; j < msg->size; j++) {
+			msg->data[j] = readv[last + j];
+		}
 		last += msg->size;
 
 		ret = send_msg(msg);
@@ -256,7 +259,7 @@ main (int argc, const char **argv)
 
 	}
 
-	SAVE_RESULTS(RESULTS_WRITE, (const int *)sortv, MAX_ELEM);
+	SAVE_RESULTS(RESULTS_WRITE, sortv, MAX_ELEM);
 
 	printf("The result can be found at file '%s'\n", FILENAME);
 

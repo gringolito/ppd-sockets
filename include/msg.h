@@ -25,8 +25,8 @@
 
 struct msg {
 	int sock;
-	ssize_t size;
-	uint32_t *data;
+	int size;
+	int *data;
 };
 
 // Functions prototypes

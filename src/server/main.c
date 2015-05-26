@@ -46,8 +46,8 @@ int
 fn_compare (const void *e1, const void *e2)
 {
 	int ret = 0;
-	uint32_t a = *((uint32_t *)e1);
-	uint32_t b = *((uint32_t *)e2);
+	int a = *((int *)e1);
+	int b = *((int *)e2);
 
 	if (a > b) {
 		ret = 1;

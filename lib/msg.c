@@ -34,8 +34,7 @@ int
 send_msg (struct msg *msg)
 {
 	int ret = 0;
-	ssize_t i;
-	struct iovec iov[2];
+	int i;
 
 	if (!msg) {
 		return (-1);
@@ -45,14 +44,15 @@ send_msg (struct msg *msg)
 	for (i = 0; i < msg->size; i++) {
 		msg->data[i] = htonl(msg->data[i]);
 	}
-	msg->size = htonl(msg->size);
 
-	iov[0].iov_base = &msg->size;
-	iov[0].iov_len = sizeof(msg->size);
-	iov[1].iov_base = msg->data;
-	iov[1].iov_len = msg->size;
+	i = htonl(msg->size);
+	if (send(msg->sock, &i, sizeof(i), 0) < 0) {
+		print_error("send() failed");
+		ret = msg->sock;
+	}
 
-	if (writev(msg->sock, iov, 2) < 0) {
+	if (send(msg->sock, msg->data, msg->size * sizeof(*msg->data), 0) < 0) {
+		print_error("send() failed");
 		ret = msg->sock;
 	}
 
@@ -63,23 +63,25 @@ send_msg (struct msg *msg)
 struct msg *
 receive_msg (int sock)
 {
-	ssize_t i;
-	ssize_t size;
-	uint32_t *data = NULL;
+	int i;
+	int size;
+	int *data = NULL;
 	struct msg *msg = NULL;
 
-	if (read(sock, &size, sizeof(size)) < 0) {
+	if (recv(sock, &size, sizeof(size), 0) < 0) {
+		print_error("recv() failed");
 		goto error;
 	}
 	size = ntohl(size);
 
 	if (size > 0) {
 		data = calloc(size, sizeof(*data));
-		if (!data) {
-			print_error("calloc() failed");
+		if (data == NULL) {
+			print_errno("calloc() failed");
 			goto error;
 		}
-		if (read(sock, data, size) < 0) {
+		if (recv(sock, data, size * sizeof(*data), 0) < 0) {
+			print_error("recv() failed");
 			free(data);
 			goto error;
 		}
