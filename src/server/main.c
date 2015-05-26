@@ -136,7 +136,7 @@ main (int argc, const char **argv)
 	hints.ai_flags    = AI_PASSIVE;
 
 	// Get server address info
-	addr_info = getaddrinfo("localhost", server_port, &hints, &addr_res);
+	addr_info = getaddrinfo(NULL, server_port, &hints, &addr_res);
 	if (addr_info) {
 		print_error("getaddrinfo() failed: %s",
 		    gai_strerror(addr_info));
