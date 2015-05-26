@@ -164,7 +164,7 @@ main (int argc, const char **argv)
 	server_sock = socket(addr_res->ai_family, addr_res->ai_socktype,
 	    addr_res->ai_protocol);
 	if (server_sock < 0) {
-		print_error("socket() failed");
+		print_errno("socket() failed");
 		return (1);
 	}
 	print_debug("Socket descriptor received %d", server_sock);
@@ -172,20 +172,20 @@ main (int argc, const char **argv)
 	// Lose the pesky "Address already in use" error message
 	if (setsockopt(server_sock, SOL_SOCKET, SO_REUSEADDR, &yes,
 	    sizeof(yes)) < 0) {
-		print_error("setsockopt() failed");
+		print_errno("setsockopt() failed");
 		return (1);
 	}
 
 	// Bind to the local address
 	if (bind(server_sock, addr_res->ai_addr, addr_res->ai_addrlen) < 0) {
 		close(server_sock);
-		print_error("bind() failed");
+		print_errno("bind() failed");
 		return (1);
 	}
 
 	// Mark the socket so it will listen for incoming connections
 	if (listen(server_sock, MAX_PENDING) < 0) {
-		print_error("listen() failed");
+		print_errno("listen() failed");
 		return (1);
 	}
 
@@ -216,7 +216,7 @@ main (int argc, const char **argv)
 			client_sock = accept(server_sock,
 			    (struct sockaddr *) &client_addr, &client_addrsize);
 			if (client_sock < 0) {
-				print_error("accept() failed");
+				print_errno("accept() failed");
 				continue;
 			}
 
