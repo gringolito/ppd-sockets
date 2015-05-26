@@ -39,7 +39,23 @@ static void
 print_usage (void)
 {
 	printf("Usage: %s <PORT>\n", PROG_NAME);
-	printf("\tPORT TCP listen port\n");
+	printf("\tPORT\tTCP listen port\n");
+}
+
+static int
+fn_compare (const void *e1, const void *e2)
+{
+	int ret = 0;
+	uint32_t a = *((uint32_t *)e1);
+	uint32_t b = *((uint32_t *)e2);
+
+	if (a > b) {
+		ret = 1;
+	} else if (a < b) {
+		ret = -1;
+	}
+
+	return (ret);
 }
 
 static int
@@ -59,33 +75,27 @@ remove_client (fd_set *readers, int fdmax, int sock)
 }
 
 static int
-handle_messages (fifo_t *receive_buffer)
+handle_messages (fifo_t *recv_buffer, fifo_t *send_buffer)
 {
 	int empty;
-	int return_status = 0;
-	char *msg;
-	void *client = NULL;
+	int ret_count = 0;
+	struct msg *msg;
 
-	empty = fifo_empty(receive_buffer);
+	empty = fifo_empty(recv_buffer);
 	while (!empty) {
-		msg = fifo_remove(receive_buffer);
-
-		// TODO FIND CLIENT
-		if (!client) {
-			print_error("[Handler] client not found in list");
-			return_status++;
-			free(msg);
-			empty = fifo_empty(receive_buffer);
-			continue;
+		msg = fifo_remove(recv_buffer);
+		if (!msg) {
+			print_error("fifo_remove() failed");
+			return (-1);
 		}
-
-		// Handle messages
-
-		free(msg);
-		empty = fifo_empty(receive_buffer);
+		// Sort vector
+		qsort(msg->data, msg->size, sizeof(*msg->data), fn_compare);
+		fifo_add(send_buffer, msg);
+		empty = fifo_empty(recv_buffer);
+		ret_count++;
 	}
 
-	return (return_status);
+	return (ret_count);
 }
 
 int
@@ -95,7 +105,7 @@ main (int argc, const char **argv)
 	int yes;
 	int empty;
 	int fdmax;
-	int sock_error = 0;
+	int fdret;
 	int select_ret;
 	int addr_info;
 	int server_sock;
@@ -107,12 +117,11 @@ main (int argc, const char **argv)
 	struct addrinfo hints;
 	struct sockaddr_storage client_addr;
 	struct timeval timeout;
-	struct timeval sel_to;
+	struct timeval to;
 	struct msg *msg;
 	socklen_t client_addrsize;
-	fd_set sel_read;
+	fd_set sel;
 	fd_set readers;
-	fd_set writers;
 	fifo_t *receive_buffer;
 	fifo_t *send_buffer;
 
@@ -133,7 +142,7 @@ main (int argc, const char **argv)
 	print_debug("Server running in DEBUG mode!");
 
 	// Setting timeout parameters to 125ms
-	timeout.tv_sec = 0;
+	timeout.tv_sec  = 0;
 	timeout.tv_usec = 125000;
 
 	// Construct the server address structure:
@@ -150,10 +159,6 @@ main (int argc, const char **argv)
 		    gai_strerror(addr_info));
 		return (1);
 	}
-
-	get_addrinfo_ipstr(server_addrstr, addr_res);
-	print_debug("Server IP address: %s", server_addrstr);
-	print_debug("Server port: %s", server_port);
 
 	// Create socket for incoming connections stream socket using TCP
 	server_sock = socket(addr_res->ai_family, addr_res->ai_socktype,
@@ -184,6 +189,10 @@ main (int argc, const char **argv)
 		return (1);
 	}
 
+	get_addrinfo_ipstr(server_addrstr, addr_res);
+	print_debug("Server IP address: %s", server_addrstr);
+	print_debug("Server port: %s", server_port);
+
 	// Initializing descriptors and FIFOs
 	FD_ZERO(&readers);
 	FD_SET(server_sock, &readers);
@@ -194,16 +203,16 @@ main (int argc, const char **argv)
 	client_addrsize = (socklen_t) sizeof(client_addr);
 
 	for EVER {
-		sel_to = timeout;
-		sel_read = readers;
-		select_ret = select(fdmax + 1, &sel_read, NULL, NULL, &sel_to);
+		to = timeout;
+		sel = readers;
+		select_ret = select(fdmax + 1, &sel, NULL, NULL, &to);
 		if (select_ret < 0) {
 			print_error("select() failed!");
 			return (1);
 		}
 
 		// Handle/Wait for a client connection
-		if (FD_ISSET(server_sock, &sel_read)) {
+		if (FD_ISSET(server_sock, &sel)) {
 			client_sock = accept(server_sock,
 			    (struct sockaddr *) &client_addr, &client_addrsize);
 			if (client_sock < 0) {
@@ -217,9 +226,8 @@ main (int argc, const char **argv)
 			printf("Handling client %s on socket %d\n",
 			    client_addrstr, client_sock);
 
-			// Setting readers and writers descriptors
+			// Setting readers descriptors
 			FD_SET(client_sock, &readers);
-			FD_SET(client_sock, &writers);
 			fdmax = MAX(fdmax, client_sock);
 
 			continue;
@@ -227,26 +235,28 @@ main (int argc, const char **argv)
 
 		// Send / receive messages
 		for (i = 0; i <= fdmax; i++) {
-			if (FD_ISSET(i, &sel_read) && i != server_sock) {
-				print_debug("Trying receive_msg() in "
-				    "socket %d ...", i);
-				msg = receive_msg(i);
-				if (!msg) {
-					print_error("receice_msg() failed, "
-					    "closing socket");
-					FD_CLR(i, &readers);
-					if (i == fdmax) {
-						fdmax--;
-					}
-					close(i);
-				} else {
-					fifo_add(receive_buffer, msg);
-				}
+			if (!FD_ISSET(i, &sel) || i == server_sock) {
+				continue;
+			}
+			print_debug("Trying receive_msg() in socket %d ...", i);
+			msg = receive_msg(i);
+			if (!msg) {
+				print_error("receice_msg() failed, closing socket");
+				fdmax = remove_client(&readers, fdmax, i);
+				continue;
+			}
+
+			// Size < 0 means no more data, closing connection
+			if (msg->size < 0) {
+				free_msg(msg);
+				fdmax = remove_client(&readers, fdmax, i);
+			} else {
+				fifo_add(receive_buffer, msg);
 			}
 		}
 
 		// Handle received messages
-		if (handle_messages(receive_buffer) < 0) {
+		if (handle_messages(receive_buffer, send_buffer) < 0) {
 			print_error("handle_messages() failed");
 		}
 
@@ -255,14 +265,10 @@ main (int argc, const char **argv)
 		while (!empty) {
 			print_debug("Trying send_msg() ...");
 			msg = fifo_remove(send_buffer);
-			sock_error = send_msg(msg);
-			if (sock_error > 0) {
+			fdret = send_msg(msg);
+			if (fdret > 0) {
 				print_error("send_msg() failed, closing socket");
-				FD_CLR(sock_error, &readers);
-				if (sock_error == fdmax) {
-					fdmax--;
-				}
-				close(sock_error);
+				fdmax = remove_client(&readers, fdmax, fdret);
 			}
 			empty = fifo_empty(send_buffer);
 		}
