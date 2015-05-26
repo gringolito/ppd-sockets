@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/uio.h>
+#include <arpa/inet.h>
 
 void
 free_msg (struct msg *msg)
