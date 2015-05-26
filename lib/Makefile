@@ -10,8 +10,8 @@
 #
 #***********************************************************************
 
-#CFLAGS=-Wall -Wextra -std=c99 -pipe -Og -g3
-CFLAGS=-Wall -Wextra -pipe -O2 -march=native
+CFLAGS=-Wall -Wextra -pipe -Og -g3
+#CFLAGS=-Wall -Wextra -pipe -O2 -march=native
 LDFLAGS=
 INC_PATH=-I../include
 DEBUG=yes

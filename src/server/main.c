@@ -59,22 +59,6 @@ fn_compare (const void *e1, const void *e2)
 }
 
 static int
-remove_client (fd_set *readers, int fdmax, int sock)
-{
-	// Unsetting file descriptors for select
-	FD_CLR(sock, readers);
-
-	if (sock == fdmax) {
-		fdmax--;
-	}
-
-	// Closing socket connection
-	close(sock);
-
-	return (fdmax);
-}
-
-static int
 handle_messages (fifo_t *recv_buffer, fifo_t *send_buffer)
 {
 	int empty;
@@ -106,7 +90,6 @@ main (int argc, const char **argv)
 	int empty;
 	int fdmax;
 	int fdret;
-	int select_ret;
 	int addr_info;
 	int server_sock;
 	int client_sock;
@@ -141,9 +124,9 @@ main (int argc, const char **argv)
 
 	print_debug("Server running in DEBUG mode!");
 
-	// Setting timeout parameters to 125ms
+	// Setting timeout parameters to 200ms
 	timeout.tv_sec  = 0;
-	timeout.tv_usec = 125000;
+	timeout.tv_usec = 200000;
 
 	// Construct the server address structure:
 	// Zero structure, make it ambiguous (IPv4 and IPv6), TCP Stream.
@@ -205,8 +188,7 @@ main (int argc, const char **argv)
 	for EVER {
 		to = timeout;
 		sel = readers;
-		select_ret = select(fdmax + 1, &sel, NULL, NULL, &to);
-		if (select_ret < 0) {
+		if (select(fdmax + 1, &sel, NULL, NULL, &to) < 0) {
 			print_error("select() failed!");
 			return (1);
 		}
@@ -233,7 +215,7 @@ main (int argc, const char **argv)
 			continue;
 		}
 
-		// Send / receive messages
+		// Receive messages
 		for (i = 0; i <= fdmax; i++) {
 			if (!FD_ISSET(i, &sel) || i == server_sock) {
 				continue;
@@ -242,14 +224,14 @@ main (int argc, const char **argv)
 			msg = receive_msg(i);
 			if (!msg) {
 				print_error("receice_msg() failed, closing socket");
-				fdmax = remove_client(&readers, fdmax, i);
+				fdmax = close_socket(&readers, fdmax, i);
 				continue;
 			}
 
 			// Size < 0 means no more data, closing connection
 			if (msg->size < 0) {
 				free_msg(msg);
-				fdmax = remove_client(&readers, fdmax, i);
+				fdmax = close_socket(&readers, fdmax, i);
 			} else {
 				fifo_add(receive_buffer, msg);
 			}
@@ -268,7 +250,7 @@ main (int argc, const char **argv)
 			fdret = send_msg(msg);
 			if (fdret > 0) {
 				print_error("send_msg() failed, closing socket");
-				fdmax = remove_client(&readers, fdmax, fdret);
+				fdmax = close_socket(&readers, fdmax, fdret);
 			}
 			empty = fifo_empty(send_buffer);
 		}

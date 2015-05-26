@@ -17,33 +17,9 @@
 
 #include "network.h"
 #include "debug.h"
+#include <unistd.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
-
-ssize_t
-tcp_send (int sock, void *buf, size_t size)
-{
-	ssize_t ret;
-
-	if ((ret = send(sock, buf, size, 0)) != (ssize_t) size) {
-		print_errno("send() sent a different number of bytes than "
-		    "expected");
-	}
-
-	return (ret);
-}
-
-ssize_t
-tcp_recv (int sock, void *buf, size_t size)
-{
-	ssize_t ret;
-
-	if ((ret = recv(sock, buf, size, 0)) <= 0) {
-		print_errno("recv() failed or connection closed prematurely");
-	}
-
-	return (ret);
-}
 
 void
 get_addrinfo_ipstr (char *dest, struct addrinfo *ptr)
@@ -80,4 +56,21 @@ get_sockaddr_ipstr (char *dest, struct sockaddr *src)
 	/* Convert the IP to a string */
 	inet_ntop(src->sa_family, addr, dest, sizeof(INET6_ADDRSTRLEN));
 }
+
+int
+close_socket (fd_set *fds, int fdmax, int fd)
+{
+	// Unsetting file descriptors for select
+	FD_CLR(fd, fds);
+
+	if (fd == fdmax) {
+		fdmax--;
+	}
+
+	// Closing socket connection
+	close(fd);
+
+	return (fdmax);
+}
+
 

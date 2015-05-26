@@ -33,6 +33,7 @@
 #include "debug.h"
 #include "network.h"
 #include "msg.h"
+#include "rank_sort.h"
 
 #define MAX_ELEM                                    (500000)
 #define MAX_SERVERS                                 (10)
@@ -49,29 +50,42 @@ print_usage (void)
 	printf("\tFILE    File containing vector data\n");
 }
 
+static void
+sort_message(uint32_t *buf, const struct msg *msg, int last)
+{
+	memcpy(&buf[last], msg->data, msg->size);
+	merge_vector((int *)buf, 0, last, last + msg->size);
+}
+
 int
 main (int argc, const char **argv)
 {
 	int i;
 	int ret;
+	int use;
 	int sock;
-	int slices;
+	int jobs;
 	int servers;
 	int servcnt = 0;
 	int fdmax = 0;
+	int last = 0;
+	int recv = 0;
 	int socks[MAX_SERVERS];
-	int readv[MAX_ELEM];
+	uint32_t readv[MAX_ELEM];
+	uint32_t sortv[MAX_ELEM];
 	char server_addr[INET6_ADDRSTRLEN];
 	char server_addrstr[INET6_ADDRSTRLEN];
 	char server_port[MAXPORT_SIZE];
 	char filename[MAXNAME_SIZE];
+	char line[BUFSIZ];
 	struct addrinfo *addr;
 	struct addrinfo hints;
 	struct timeval timeout;
 	struct timeval to;
+	struct msg *msg;
 	FILE *fd;
 	fd_set sel;
-	fd_set writers;
+	fd_set readers;
 
 	prgname = argv[0];
 	// Test for correct number of arguments
@@ -82,16 +96,17 @@ main (int argc, const char **argv)
 
 	servers = atoi(argv[1]);
 	if (servers <= 0 || servers > MAX_SERVERS) {
-		print_error("Invalid number of servers %d (Max: %d)",
+		print_error("Invalid number of servers: %d (Max: %d)",
 		    servers, MAX_SERVERS);
 		return (1);
 	}
 
-	slices = atoi(argv[2]);
-	if (slices <= 0) {
-		print_error("Invalid number of jobs %d", slices);
+	jobs = atoi(argv[2]);
+	if (jobs <= 0) {
+		print_error("Invalid number of jobs: %d", jobs);
 		return (1);
 	}
+
 	strncpy(filename, argv[3], sizeof(filename));
 
 	print_debug("Client running in DEBUG mode!");
@@ -103,7 +118,7 @@ main (int argc, const char **argv)
 		return (1);
 	}
 	for (i = 0; (size_t) i < MAX_ELEM; i++) {
-		ret = fscanf(fd, "%d", &readv[i]);
+		ret = fscanf(fd, "%u", &readv[i]);
 		if (ret < 0) {
 			print_errno("fscanf() failed!");
 			return (ret);
@@ -113,11 +128,11 @@ main (int argc, const char **argv)
 	fclose(fd);
 
 	// Initializing descriptors
-	FD_ZERO(&writers);
+	FD_ZERO(&readers);
 
-	// Setting timeout parameters to 125ms
+	// Setting timeout parameters to 200ms
 	timeout.tv_sec  = 0;
-	timeout.tv_usec = 125000;
+	timeout.tv_usec = 200000;
 
 	fd = fopen(SERVERLIST, "r");
 	if (!fd) {
@@ -127,10 +142,18 @@ main (int argc, const char **argv)
 
 	// Connect to servers
 	for (i = 0; i < servers; i++) {
-		if (fscanf(fd, "%128[^:]:%5s", server_addr, server_port) != 2) {
+		if (fgets(line, sizeof(line), fd) == NULL) {
+			print_debug("No more known servers to read, "
+			    "continuing ...");
+			break;
+		}
+		if (sscanf(line, "%128[^:]:%5s", server_addr, server_port) != 2) {
+			print_debug("Ignoring invalid server ...");
 			continue;
 		}
 
+		print_debug("Server Address: %s Server Port: %s",
+		    server_addr, server_port);
 		// Construct the server address structure:
 		// Zero structure, make it ambiguous (IPv4/IPv6), TCP Stream.
 		memset(&hints, 0, sizeof(hints));
@@ -155,7 +178,7 @@ main (int argc, const char **argv)
 		// Establish the connection to the server
 		if (connect(sock, addr->ai_addr, addr->ai_addrlen) < 0) {
 			print_errno("connect() failed");
-
+			close(sock);
 			continue;
 		}
 
@@ -164,17 +187,77 @@ main (int argc, const char **argv)
 		print_debug("Server %02d IP address: %s", servcnt,
 		    server_addrstr);
 
-		FD_SET(sock, &writers);
+		FD_SET(sock, &readers);
 		fdmax = MAX(fdmax, sock);
 	}
 
 	fclose(fd);
 
-	for (i = 0; i < slices; i++) {
+	if (servcnt == 0) {
+		print_error("Can't find a valid server, aborting execution ...");
+		return (1);
+	}
+
+	// Send messages to servers
+	for (i = 0, use = 0; i < jobs; i++, use++) {
+		msg = calloc(1, sizeof(*msg));
+		if (!msg) {
+			print_error("calloc failed()");
+			return (1);
+		}
+
+		if (use == servcnt) {
+			use = 0;
+		}
+		msg->sock = socks[use];
+
+		if (i == jobs - 1) {
+			msg->size = MAX_ELEM % jobs;
+		} else {
+			msg->size = MAX_ELEM / jobs;
+		}
+
+		msg->data = calloc(msg->size, sizeof(*msg->data));
+		memcpy(msg->data, &readv[last], msg->size);
+		last += msg->size;
+
+		ret = send_msg(msg);
+		if (ret > 0) {
+			print_error("send_msg() failed, closing socket");
+			fdmax = close_socket(&readers, fdmax, ret);
+		}
 
 	}
 
-	SAVE_RESULTS(RESULTS_WRITE, readv, MAX_ELEM);
+	while (recv < last) {
+		to = timeout;
+		sel = readers;
+		if (select(fdmax + 1, &sel, NULL, NULL, &to) < 0) {
+			print_error("select() failed!");
+			return (1);
+		}
+
+		// Receive messages
+		for (i = 0; i <= fdmax; i++) {
+			if (!FD_ISSET(i, &sel)) {
+				continue;
+			}
+			print_debug("Trying receive_msg() in socket %d ...", i);
+			msg = receive_msg(i);
+			if (!msg) {
+				print_error("receice_msg() failed, closing socket");
+				fdmax = close_socket(&readers, fdmax, i);
+				continue;
+			}
+
+			sort_message(sortv, msg, recv);
+			recv += msg->size;
+			free_msg(msg);
+		}
+
+	}
+
+	SAVE_RESULTS(RESULTS_WRITE, (const int *)sortv, MAX_ELEM);
 
 	printf("The result can be found at file '%s'\n", FILENAME);
 

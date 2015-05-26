@@ -43,5 +43,16 @@ void get_addrinfo_ipstr (char *dest, struct addrinfo *ptr);
  */
 void get_sockaddr_ipstr (char *dest, struct sockaddr *src);
 
+/**
+ * @brief Update data for select and close connection on socket
+ *
+ * @param fds I/O descriptors
+ * @param fdmax Number of descriptors
+ * @param fd File descriptor to close
+ *
+ * @return Updated number of descriptors
+ */
+int close_socket (fd_set *fds, int fdmax, int fd);
+
 #endif // __FUTZIG_NETWORK_H
 

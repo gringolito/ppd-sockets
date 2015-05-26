@@ -11,8 +11,8 @@
 #***********************************************************************
 
 CC=cc
-#CFLAGS=-Wall -Wextra -std=c99 -pipe -Og -g3
-CFLAGS=-Wall -Wextra -pipe -O2 -march=native
+CFLAGS=-Wall -Wextra -pipe -Og -g3
+#CFLAGS=-Wall -Wextra -pipe -O2 -march=native
 LDFLAGS=
 EXTRA_CFLAGS=-DPROG_NAME=\"$(TARGET)\"
 DEBUG=no
