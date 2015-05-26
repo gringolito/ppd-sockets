@@ -35,7 +35,7 @@
 #include "msg.h"
 #include "rank_sort.h"
 
-#define MAX_ELEM                                    (500000)
+#define MAX_ELEM                                    (100000)
 #define MAX_SERVERS                                 (10)
 #define MAXNAME_SIZE                                (64)
 #define FILENAME                                    "sorted_vector.txt"
@@ -147,13 +147,11 @@ main (int argc, const char **argv)
 			    "continuing ...");
 			break;
 		}
-		if (sscanf(line, "%128[^:]:%5s", server_addr, server_port) != 2) {
+		if (sscanf(line, "%128[^ ] %5s", server_addr, server_port) != 2) {
 			print_debug("Ignoring invalid server ...");
 			continue;
 		}
 
-		print_debug("Server Address: %s Server Port: %s",
-		    server_addr, server_port);
 		// Construct the server address structure:
 		// Zero structure, make it ambiguous (IPv4/IPv6), TCP Stream.
 		memset(&hints, 0, sizeof(hints));
@@ -184,7 +182,7 @@ main (int argc, const char **argv)
 
 		socks[servcnt++] = sock;
 		get_addrinfo_ipstr(server_addrstr, addr);
-		print_debug("Server %02d IP address: %s", servcnt,
+		print_debug("Server %d -> IP address: %s", servcnt,
 		    server_addrstr);
 
 		FD_SET(sock, &readers);
@@ -223,7 +221,7 @@ main (int argc, const char **argv)
 
 		ret = send_msg(msg);
 		if (ret > 0) {
-			print_error("send_msg() failed, closing socket");
+			print_error("send_msg() failed, closing socket %d", ret);
 			fdmax = close_socket(&readers, fdmax, ret);
 		}
 
@@ -245,7 +243,8 @@ main (int argc, const char **argv)
 			print_debug("Trying receive_msg() in socket %d ...", i);
 			msg = receive_msg(i);
 			if (!msg) {
-				print_error("receice_msg() failed, closing socket");
+				print_error("receice_msg() failed, closing socket"
+				    "%d", i);
 				fdmax = close_socket(&readers, fdmax, i);
 				continue;
 			}

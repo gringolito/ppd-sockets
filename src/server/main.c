@@ -42,7 +42,7 @@ print_usage (void)
 	printf("\tPORT\tTCP listen port\n");
 }
 
-static int
+int
 fn_compare (const void *e1, const void *e2)
 {
 	int ret = 0;
@@ -223,18 +223,13 @@ main (int argc, const char **argv)
 			print_debug("Trying receive_msg() in socket %d ...", i);
 			msg = receive_msg(i);
 			if (!msg) {
-				print_error("receice_msg() failed, closing socket");
+				print_error("receice_msg() failed, closing socket"
+				    "%d", i);
 				fdmax = close_socket(&readers, fdmax, i);
 				continue;
 			}
 
-			// Size < 0 means no more data, closing connection
-			if (msg->size < 0) {
-				free_msg(msg);
-				fdmax = close_socket(&readers, fdmax, i);
-			} else {
-				fifo_add(receive_buffer, msg);
-			}
+			fifo_add(receive_buffer, msg);
 		}
 
 		// Handle received messages
@@ -249,7 +244,8 @@ main (int argc, const char **argv)
 			msg = fifo_remove(send_buffer);
 			fdret = send_msg(msg);
 			if (fdret > 0) {
-				print_error("send_msg() failed, closing socket");
+				print_error("send_msg() failed, closing socket"
+				    "%d", fdret);
 				fdmax = close_socket(&readers, fdmax, fdret);
 			}
 			empty = fifo_empty(send_buffer);
