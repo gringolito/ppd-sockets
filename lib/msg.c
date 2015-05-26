@@ -33,7 +33,7 @@ int
 send_msg (struct msg *msg)
 {
 	int ret = 0;
-	size_t i;
+	ssize_t i;
 	struct iovec iov[2];
 
 	if (!msg) {
@@ -62,9 +62,9 @@ send_msg (struct msg *msg)
 struct msg *
 receive_msg (int sock)
 {
-	size_t i;
-	size_t size;
-	uint32_t *data;
+	ssize_t i;
+	ssize_t size;
+	uint32_t *data = NULL;
 	struct msg *msg = NULL;
 
 	if (read(sock, &size, sizeof(size)) < 0) {
@@ -72,21 +72,24 @@ receive_msg (int sock)
 	}
 	size = ntohl(size);
 
-	data = calloc(size, sizeof(*data));
-	if (!data) {
-		print_error("calloc() failed");
-		goto error;
-	}
-	if (read(sock, data, size) < 0) {
-		free(data);
-		goto error;
+	if (size > 0) {
+		data = calloc(size, sizeof(*data));
+		if (!data) {
+			print_error("calloc() failed");
+			goto error;
+		}
+		if (read(sock, data, size) < 0) {
+			free(data);
+			goto error;
+		}
+
+		// Converting endianness
+		for (i = 0; i < size; i++) {
+			data[i] = ntohl(data[i]);
+		}
+
 	}
 
-	// Converting endianness
-	for (i = 0; i < size; i++) {
-		data[i] = ntohl(data[i]);
-	}
-	
 	msg = calloc(1, sizeof(*msg));
 	if (!msg) {
 		print_error("calloc() failed");

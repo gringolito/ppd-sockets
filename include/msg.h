@@ -22,36 +22,39 @@
 #include <sys/types.h>
 
 // Data structures
+
 struct msg {
 	int sock;
-	size_t size;
+	ssize_t size;
 	uint32_t *data;
 };
 
 // Functions prototypes
 
 /**
- * @brief 
+ * @brief Free a structure message
  *
- * @param msg
+ * @param msg Message to be released
  */
 void free_msg (struct msg *msg);
 
 /**
- * @brief 
+ * @brief Unpack and send a structure message over a TCP socket
  *
- * @param msg
+ * @param msg Message to be sent (this message will be released after send)
  *
- * @return 
+ * @retval 0, on success
+ * @retval Socket fd otherwise
  */
 int send_msg (struct msg *msg);
 
 /**
- * @brief 
+ * @brief Alloc and pack a structure message received on a TCP socket
  *
- * @param sock
+ * @param sock Socket fd to receive message
  *
- * @return 
+ * @return a pointer to message, on success
+ * @return NULL, otherwise
  */
 struct msg *receive_msg (int sock);
 
