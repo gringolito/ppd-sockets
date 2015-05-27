@@ -26,16 +26,16 @@ get_addrinfo_ipstr (char *dest, struct addrinfo *ptr)
 {
 	void *addr;
 
-	/* ÌPv4 */
+	// ÌPv4
 	if (ptr->ai_family == AF_INET) {
 		struct sockaddr_in *ipv4 = (struct sockaddr_in *)ptr->ai_addr;
 		addr = &(ipv4->sin_addr);
-	/* ÌPv6 */
+	// ÌPv6
 	} else {
 		struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)ptr->ai_addr;
 		addr = &(ipv6->sin6_addr);
 	}
-	/* Convert the IP to a string */
+	// Convert the IP to a string
 	inet_ntop(ptr->ai_family, addr, dest, sizeof(INET6_ADDRSTRLEN));
 }
 
@@ -44,16 +44,16 @@ get_sockaddr_ipstr (char *dest, struct sockaddr *src)
 {
 	void *addr;
 
-	/* ÌPv4 */
+	// ÌPv4
 	if (src->sa_family == AF_INET) {
 		struct sockaddr_in *ipv4 = (struct sockaddr_in *)src;
 		addr = &(ipv4->sin_addr);
-	/* ÌPv6 */
+	// ÌPv6
 	} else {
 		struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)src;
 		addr = &(ipv6->sin6_addr);
 	}
-	/* Convert the IP to a string */
+	// Convert the IP to a string
 	inet_ntop(src->sa_family, addr, dest, sizeof(INET6_ADDRSTRLEN));
 }
 

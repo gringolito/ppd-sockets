@@ -35,6 +35,8 @@ send_msg (struct msg *msg)
 {
 	int ret = 0;
 	int i;
+	int size;
+	struct iovec iov[2];
 
 	if (!msg) {
 		return (-1);
@@ -46,12 +48,15 @@ send_msg (struct msg *msg)
 	}
 
 	i = htonl(msg->size);
-	if (send(msg->sock, &i, sizeof(i), 0) < 0) {
-		print_error("send() failed");
-		ret = msg->sock;
-	}
+	size = msg->size * sizeof(*msg->data);
 
-	if (send(msg->sock, msg->data, msg->size * sizeof(*msg->data), 0) < 0) {
+	iov[0].iov_base = &i;
+	iov[0].iov_len = sizeof(i);
+	iov[1].iov_base = msg->data;
+	iov[1].iov_len = size;
+
+	size += sizeof(i);
+	if (writev(msg->sock, iov, 2) != size) {
 		print_error("send() failed");
 		ret = msg->sock;
 	}
@@ -65,11 +70,13 @@ receive_msg (int sock)
 {
 	int i;
 	int size;
+	int ret;
+	int rec = 0;
+	int rec_size;
 	int *data = NULL;
 	struct msg *msg = NULL;
 
 	if (recv(sock, &size, sizeof(size), 0) < 0) {
-		print_error("recv() failed");
 		goto error;
 	}
 	size = ntohl(size);
@@ -80,10 +87,16 @@ receive_msg (int sock)
 			print_errno("calloc() failed");
 			goto error;
 		}
-		if (recv(sock, data, size * sizeof(*data), 0) < 0) {
-			print_error("recv() failed");
-			free(data);
-			goto error;
+
+		rec_size = size * sizeof(*data);
+		while (rec != rec_size) {
+			ret = recv(sock, &data[rec], rec_size - rec, 0);
+			if (ret < 0) {
+				print_error("recv() failed");
+				free(data);
+				goto error;
+			}
+			rec += ret;
 		}
 
 		// Converting endianness

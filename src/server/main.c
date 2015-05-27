@@ -222,9 +222,8 @@ main (int argc, const char **argv)
 			}
 			print_debug("Trying receive_msg() in socket %d ...", i);
 			msg = receive_msg(i);
+			// Error occured or end of connection
 			if (!msg) {
-				print_error("receice_msg() failed, closing socket"
-				    "%d", i);
 				fdmax = close_socket(&readers, fdmax, i);
 				continue;
 			}
@@ -245,7 +244,7 @@ main (int argc, const char **argv)
 			fdret = send_msg(msg);
 			if (fdret > 0) {
 				print_error("send_msg() failed, closing socket"
-				    "%d", fdret);
+				    " %d", fdret);
 				fdmax = close_socket(&readers, fdmax, fdret);
 			}
 			empty = fifo_empty(send_buffer);

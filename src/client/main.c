@@ -35,7 +35,7 @@
 #include "msg.h"
 #include "rank_sort.h"
 
-#define MAX_ELEM                                    (100)
+#define MAX_ELEM                                    (100000)
 #define MAX_SERVERS                                 (10)
 #define MAXNAME_SIZE                                (64)
 #define FILENAME                                    "sorted_vector.txt"
@@ -53,7 +53,9 @@ print_usage (void)
 static void
 sort_message(int *buf, const struct msg *msg, int last)
 {
-	memcpy(&buf[last], msg->data, msg->size * sizeof(*msg->data));
+	int size = msg->size * sizeof(*msg->data);
+
+	memcpy(&buf[last], msg->data, size);
 	merge_vector(buf, 0, last, last + msg->size);
 }
 
@@ -247,7 +249,7 @@ main (int argc, const char **argv)
 			msg = receive_msg(i);
 			if (!msg) {
 				print_error("receice_msg() failed, closing socket"
-				    "%d", i);
+				    " %d", i);
 				fdmax = close_socket(&readers, fdmax, i);
 				continue;
 			}

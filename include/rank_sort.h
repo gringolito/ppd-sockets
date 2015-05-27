@@ -55,10 +55,7 @@ merge_vector (int *vector, const int begin, const int mid, const int end)
 		}
 	}
 
-//	memcpy(&vector[begin], tmp, size);
-	for (j = 0, ib = begin; ib < end; j++, ib++) {
-		vector[ib] = tmp[j];
-	}
+	memcpy(&vector[begin], tmp, sizeof(tmp));
 }
 
 #endif //__FUTZIG_RANK_SORT_H
