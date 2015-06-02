@@ -71,7 +71,6 @@ receive_msg (int sock)
 	int i;
 	int size;
 	int ret;
-	int rec = 0;
 	int rec_size;
 	int *data = NULL;
 	struct msg *msg = NULL;
@@ -89,14 +88,11 @@ receive_msg (int sock)
 		}
 
 		rec_size = size * sizeof(*data);
-		while (rec != rec_size) {
-			ret = recv(sock, &data[rec], rec_size, 0);
-			if (ret < 0) {
-				print_error("recv() failed");
-				free(data);
-				goto error;
-			}
-			rec += ret;
+		ret = recv(sock, data, rec_size, 0);
+		if (ret < 0) {
+			print_error("recv() failed");
+			free(data);
+			goto error;
 		}
 
 		// Converting endianness
