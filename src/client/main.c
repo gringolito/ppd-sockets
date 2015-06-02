@@ -35,7 +35,7 @@
 #include "msg.h"
 #include "rank_sort.h"
 
-#define MAX_ELEM                                    (100000)
+#define MAX_ELEM                                    (1000)
 #define MAX_SERVERS                                 (10)
 #define MAXNAME_SIZE                                (64)
 #define FILENAME                                    "sorted_vector.txt"

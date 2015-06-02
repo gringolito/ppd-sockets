@@ -90,7 +90,7 @@ receive_msg (int sock)
 
 		rec_size = size * sizeof(*data);
 		while (rec != rec_size) {
-			ret = recv(sock, &data[rec], rec_size - rec, 0);
+			ret = recv(sock, &data[rec], rec_size, 0);
 			if (ret < 0) {
 				print_error("recv() failed");
 				free(data);
