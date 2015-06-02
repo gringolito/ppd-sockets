@@ -75,7 +75,7 @@ receive_msg (int sock)
 	int *data = NULL;
 	struct msg *msg = NULL;
 
-	if (recv(sock, &size, sizeof(size), 0) < 0) {
+	if (recv(sock, &size, sizeof(size), 0) <= 0) {
 		goto error;
 	}
 	size = ntohl(size);
